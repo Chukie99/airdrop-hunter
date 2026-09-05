@@ -159,6 +159,53 @@ class AirdropHunter:
         
         return campaigns
     
+    def _translate_step(self, step):
+        """Translate common English terms to Indonesian"""
+        translations = [
+            ('Visit the', 'Kunjungi'),
+            ('Connect Your', 'Hubungkan'),
+            ('Solana Wallet', 'Wallet Solana'),
+            ('Ethereum Wallet', 'Wallet Ethereum'),
+            ('Wallet', 'Wallet'),
+            ('Acquire', 'Dapatkan'),
+            ('Ensure you have sufficient', 'Pastikan kamu punya cukup'),
+            ('in your wallet for', 'di wallet untuk'),
+            ('and transaction fees', 'dan biaya transaksi'),
+            ('Complete Initial Setup', 'Selesaikan Setup Awal'),
+            ('Connect your social media accounts', 'Hubungkan akun media sosial kamu'),
+            ('as prompted', 'seperti yang diminta'),
+            ('You can purchase', 'Kamu bisa beli'),
+            ('directly from', 'langsung dari'),
+            ('or use the bridge widget below', 'atau pakai bridge di bawah'),
+            ('Bridge funds', 'Bridge dana'),
+            ('Follow', 'Follow'),
+            ('Join', 'Gabung'),
+            ('Telegram Group', 'Grup Telegram'),
+            ('Discord Server', 'Server Discord'),
+            ('Twitter', 'Twitter/X'),
+            ('Like', 'Like'),
+            ('Retweet', 'Retweet'),
+            ('Submit', 'Kirim'),
+            ('Enter', 'Masukkan'),
+            ('Your', 'Kamu'),
+            ('Address', 'Alamat'),
+            ('Claim', 'Klaim'),
+            ('Stake', 'Stake'),
+            ('Deposit', 'Deposit'),
+            ('Trade', 'Trade'),
+            ('Swap', 'Swap'),
+            ('Mint', 'Mint'),
+            ('Platform', 'Platform'),
+            ('Tokens', 'Token'),
+            ('Token', 'Token'),
+            ('every day', 'setiap hari'),
+            ('Daily', 'Harian'),
+        ]
+        result = step
+        for eng, indo in translations:
+            result = result.replace(eng, indo)
+        return result
+    
     def _scrape_detail(self, url):
         """Scrape detail page for step-by-step instructions"""
         detail = {'steps': [], 'how_to': '', 'estimated': ''}
@@ -171,20 +218,19 @@ class AirdropHunter:
         howto_match = re.search(r'(?:How to participate|Cara|Steps?|Instructions?).*?<ol[^>]*>(.*?)</ol>', data, re.DOTALL | re.IGNORECASE)
         if howto_match:
             steps = re.findall(r'<li[^>]*>(.*?)</li>', howto_match.group(1), re.DOTALL)
-            detail['steps'] = [re.sub(r'<[^>]+>', '', s).strip() for s in steps[:5]]
+            detail['steps'] = [self._translate_step(re.sub(r'<[^>]+>', '', s).strip()) for s in steps[:5]]
+        
+        # If no ol, try ul
+        if not detail['steps']:
+            howto_match = re.search(r'(?:How to participate|Cara|Steps?|Instructions?).*?<ul[^>]*>(.*?)</ul>', data, re.DOTALL | re.IGNORECASE)
+            if howto_match:
+                steps = re.findall(r'<li[^>]*>(.*?)</li>', howto_match.group(1), re.DOTALL)
+                detail['steps'] = [self._translate_step(re.sub(r'<[^>]+>', '', s).strip()) for s in steps[:5]]
         
         # Extract estimated value
         est_match = re.search(r'(?:Estimated|Value|Reward|Token).*?(\$[\d,.]+)', data, re.IGNORECASE)
         if est_match:
             detail['estimated'] = est_match.group(1)
-        
-        # Extract "how to" from content
-        howto_match2 = re.search(r'class="entry-content[^"]*">(.*?)(?:</div>|<h[23])', data, re.DOTALL)
-        if howto_match2:
-            text = re.sub(r'<[^>]+>', ' ', howto_match2.group(1))
-            text = re.sub(r'\s+', ' ', text).strip()
-            if len(text) > 50:
-                detail['how_to'] = text[:300]
         
         return detail
     
