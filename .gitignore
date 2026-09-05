@@ -1,0 +1,5 @@
+config/.env
+config/seen_airdrops.json
+logs/
+__pycache__/
+*.pyc
