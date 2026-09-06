@@ -1,5 +1,7 @@
 config/.env
 config/seen_airdrops.json
 logs/
+data/airdrops_OP.csv
+data/airdrops_OP.xlsx
 __pycache__/
 *.pyc
