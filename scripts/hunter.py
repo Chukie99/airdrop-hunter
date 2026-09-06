@@ -34,7 +34,8 @@ SCAM_KEYWORDS = [
 PAYMENT_KEYWORDS = [
     'bridge', 'swap', 'stake', 'deposit', 'buy', 'purchase',
     'gas fee', 'transaction fee', 'pay ', 'invest', 'mint nft',
-    'sol', 'eth', 'bnb', 'matic', 'usdt', 'usdc', 'fee required'
+    'sol', 'eth', 'bnb', 'matic', 'usdt', 'usdc', 'fee required',
+    'trade', 'trading', 'volume', 'liquidity', 'perpetual', 'futures', 'top up', 'topup'
 ]
 
 class AirdropHunter:
@@ -144,12 +145,15 @@ class AirdropHunter:
         txt=(content+" "+actions+" "+" ".join(steps)).lower()
         scam, why=self._is_scam(txt)
         if scam: return True, f"SCAM Risk: {why}"
-        for kw in PAYMENT_KEYWORDS:
+        # STRICT FREE: apapun yang butuh modal = skip
+        hard_block = ['bridge','swap','stake','deposit','gas fee','transaction fee','mint nft','trade','trading','volume','liquidity','perpetual','futures','top up','topup']
+        for kw in hard_block:
             if kw in txt:
-                # allow social "follow" without pay, but bridge/swap is hard filter
-                if kw in ['bridge','swap','stake','deposit','gas fee','transaction fee','mint nft']:
-                    return True, f"Butuh bayar: {kw}"
-        # soft: if actions mention buy/purchase with token names
+                return True, f"Butuh modal: {kw}"
+        # soft block untuk buy/pay/invest kalau barengan trading
+        for kw in ['buy','purchase','pay ','invest','fee required']:
+            if kw in txt and any(x in txt for x in ['trade','swap','bridge','stake','deposit']):
+                return True, f"Butuh bayar: {kw}"
         return False, ""
 
     def _score(self, c):
