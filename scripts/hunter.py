@@ -258,15 +258,49 @@ class AirdropHunter:
         d={'steps':[],'actions':''}
         data=self._curl_get(url, {'User-Agent':'Mozilla/5.0'})
         if not data: return d
+        # 1) JSON-LD HowTo (paling bersih - airdrops.io pakai ini)
+        try:
+            for jm in re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', data, re.DOTALL):
+                try: j=json.loads(jm)
+                except: continue
+                cands=[]
+                if isinstance(j, dict) and '@graph' in j: cands=j['@graph']
+                elif isinstance(j, list): cands=j
+                else: cands=[j]
+                for node in cands:
+                    if not isinstance(node, dict): continue
+                    # cek HowTo langsung
+                    howtos=[]
+                    if node.get('@type')=='HowTo' and 'step' in node: howtos.append(node)
+                    for subj in node.get('subjectOf',[]) if isinstance(node.get('subjectOf'), list) else []:
+                        if isinstance(subj, dict) and subj.get('@type')=='HowTo': howtos.append(subj)
+                    for hw in howtos:
+                        cleaned=[]
+                        for s in hw.get('step',[]):
+                            if isinstance(s, dict):
+                                t=(s.get('text') or s.get('name') or '').strip()
+                                t=re.sub(r'<[^>]+>','',t).strip()
+                                if t and len(t)>10 and 'Airdrop Is Almost Here' not in t and t.upper()!='JOIN NOW':
+                                    cleaned.append(self._translate_step(t))
+                        if cleaned:
+                            d['steps']=cleaned[:6]
+                            return d
+        except Exception as e:
+            self._log(f"JSON-LD fail {url[:40]}: {e}")
+        # 2) fallback ol/ul
         m=re.search(r'(?:How to participate|Cara|Steps?|Instructions?).*?<ol[^>]*>(.*?)</ol>', data, re.DOTALL|re.IGNORECASE)
         if m:
             steps=re.findall(r'<li[^>]*>(.*?)</li>', m.group(1), re.DOTALL)
-            d['steps']=[self._translate_step(re.sub(r'<[^>]+>','',s).strip()) for s in steps[:5] if s.strip()]
+            cand=[self._translate_step(re.sub(r'<[^>]+>','',s).strip()) for s in steps[:6] if s.strip()]
+            cand=[c for c in cand if 'Airdrop Is Almost Here' not in c and c.upper()!='JOIN NOW' and len(c)>12]
+            if cand: d['steps']=cand
         if not d['steps']:
             m=re.search(r'(?:How to participate|Cara|Steps?|Instructions?).*?<ul[^>]*>(.*?)</ul>', data, re.DOTALL|re.IGNORECASE)
             if m:
                 steps=re.findall(r'<li[^>]*>(.*?)</li>', m.group(1), re.DOTALL)
-                d['steps']=[self._translate_step(re.sub(r'<[^>]+>','',s).strip()) for s in steps[:5] if s.strip()]
+                cand=[self._translate_step(re.sub(r'<[^>]+>','',s).strip()) for s in steps[:6] if s.strip()]
+                cand=[c for c in cand if 'Airdrop Is Almost Here' not in c and len(c)>12]
+                if cand: d['steps']=cand
         am=re.search(r"Actions:.*?<span>(.*?)</span>", data, re.DOTALL)
         if am: d['actions']=self._translate_step(re.sub(r'<[^>]+>','',am.group(1)).strip())
         return d
@@ -311,32 +345,40 @@ class AirdropHunter:
         if not campaigns: return None
         campaigns=sorted(campaigns, key=lambda x: x.get('score',0), reverse=True)
         hot=[c for c in campaigns if c.get('temperature',0)>=OP_CONFIG["alert_hot_temp"] and c.get('confirmed')]
-        header="🚨 <b>HOT AIRDROP TERDETEKSI</b> 🚨\n" if hot else "🎯 <b>AIRDROP GRATIS — OP DIGEST</b>\n"
+        header="\U0001f6a8 <b>HOT AIRDROP</b> \U0001f6a8\n" if hot else "\U0001f3af <b>AIRDROP GRATIS - OP</b>\n"
         msg=header
-        msg+=f"💰 100% FREE • Anti-KYC • Anti-Bayar\n"
-        msg+=f"📅 {datetime.now().strftime('%d %b %Y %H:%M WIB')} • {len(campaigns)} baru\n"
+        msg+=f"\U0001f4c5 {datetime.now().strftime('%d %b %Y %H:%M WIB')} - {len(campaigns)} baru (FREE, no KYC, no bayar)\n"
         msg+=f"{'='*30}\n\n"
         for c in campaigns[:OP_CONFIG["top_n_telegram"]]:
             temp=c.get('temperature',0); score=c.get('score',0)
-            confirmed="✅" if c.get('confirmed') else ""
-            if temp>=100: emoji='🔥🔥'
-            elif temp>=50: emoji='🔥'
-            elif temp>=20: emoji='⭐'
-            else: emoji='🆕'
-            # score badge
-            msg+=f"{emoji} <b>{c['name']}</b> {confirmed} (score:{score})\n"
-            if c.get('requirements'): msg+=f"📌 Siapin: {', '.join(c['requirements'])}\n"
-            msg+=f"🔥 Heat:{temp}° | 📦 {c.get('source','')}\n"
-            if c.get('steps'):
-                msg+=f"📋 <b>Cara:</b>\n"
-                for i,s in enumerate(c['steps'][:3],1): msg+=f" {i}. {s[:90]}\n"
-            elif c.get('actions'): msg+=f"📋 {c['actions'][:120]}\n"
-            msg+=f"🔗 {c['url']}\n"
+            confirmed=" CONFIRMED" if c.get('confirmed') else " (speculative)"
+            if temp>=150: emoji='\U0001f525\U0001f525'
+            elif temp>=80: emoji='\U0001f525'
+            elif temp>=30: emoji='\u2b50'
+            else: emoji='\U0001f195'
+            steps=c.get('steps',[])
+            if len(steps)<=3 and not c.get('requirements'): est="~2 menit"
+            elif len(steps)<=5: est="~5-10 menit"
+            else: est="~10-15 menit"
+            msg+=f"{emoji} <b>{c['name']}</b>{confirmed}\n"
+            msg+=f"Heat:{temp} - Score:{score} - {est} - {c.get('source','')}\n"
+            if c.get('requirements'): msg+=f"\U0001f4cc Syarat: {', '.join(c['requirements'])} (siapin dulu)\n"
+            else: msg+=f"\U0001f4cc Syarat: cuma Sosmed (Follow/Join)\n"
+            if steps:
+                msg+=f"\U0001f4cb Cara (ringkas):\n"
+                for i,s in enumerate(steps[:3],1):
+                    ss=s[:85] + ("..." if len(s)>85 else "")
+                    msg+=f" {i}. {ss}\n"
+                if len(steps)>3: msg+=f"   +{len(steps)-3} langkah lagi di link\n"
+            elif c.get('actions'): msg+=f"\U0001f4cb {c['actions'][:110]}\n"
+            else: msg+=f"\U0001f4cb Buka link -> ikuti panduan di halaman\n"
+            msg+=f"\U0001f517 {c['url']}\n"
+            msg+=f"\U0001f4a1 Gratis - jangan deposit/bridge/swap\n"
             msg+=f"{'─'*28}\n\n"
         if len(campaigns)>OP_CONFIG["top_n_telegram"]:
-            msg+=f"… +{len(campaigns)-OP_CONFIG['top_n_telegram']} airdrop lain di Excel\n\n"
-        msg+=f"📊 Excel: <code>{OP_CONFIG['excel_path']}</code>\n"
-        msg+=f"💡 Semua GRATIS — cuma butuh Twitter/Telegram, jangan connect wallet bayar!"
+            msg+=f"... +{len(campaigns)-OP_CONFIG['top_n_telegram']} lagi lengkap di Excel\n\n"
+        msg+=f"\U0001f4ca File: <code>{OP_CONFIG['excel_path']}</code> (buka di HP/PC)\n"
+        msg+=f"\u26a0\ufe0f Selalu cek: kalau diminta seed phrase / kirim uang = SCAM, skip!"
         return msg
 
     def run(self, dry_run=False):
