@@ -1,23 +1,34 @@
-name: Airdrop Hunter
+name: Airdrop Hunter OP (3h)
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: "0 */3 * * *"  # tiap 3 jam UTC = 07,10,13,16,19,22,01,04 WIB
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-      
-      - name: Run Airdrop Hunter
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install deps
+        run: pip install requests pandas openpyxl
+      - name: Run hunter
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/hunter.py
+      - name: Commit seen + data
+        run: |
+          git config user.name "hunter-bot"
+          git config user.email "hunter-bot@github.local"
+          git add -f config/seen_airdrops.json data/airdrops_OP.xlsx data/airdrops_OP.csv 2>/dev/null || true
+          git diff --staged --quiet && echo "no changes" || (git commit -m "chore: update hunter data [skip ci]" && git push)
