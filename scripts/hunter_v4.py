@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import re
+import subprocess
 from datetime import datetime, timedelta
 
 class AirdropHunterV4:
@@ -11,7 +12,6 @@ class AirdropHunterV4:
         self.seen_file = "config/seen_airdrops.json"
         self.seen = self._load_seen()
         
-        # Scam keywords
         self.scam_keywords = [
             'private key', 'seed phrase', 'recovery phrase',
             'send eth', 'send sol', 'send bnb', 'send matic',
@@ -19,7 +19,6 @@ class AirdropHunterV4:
             'pay to claim', 'buy token', 'purchase',
         ]
         
-        # Affiliate domains to EXCLUDE
         self.affiliate_domains = [
             'airdrops.io', 'airdropalert.com', 'coingabbar.com',
             'alphadrops.net', 'airdropbuzz.com', 'cryptorank.io',
@@ -68,151 +67,93 @@ class AirdropHunterV4:
                     return False, indicator
         return True, ""
     
-    def _extract_detailed_tasks(self, html, url):
-        """Extract detailed step-by-step tasks from official website"""
-        tasks = []
-        
-        # Pattern 1: Numbered lists (most common)
-        steps = re.findall(r'<(?:li|p)[^>]*>\s*(?:<[^>]+>)*\s*(\d+[\.\)]\s*.*?)(?:</(?:li|p)>|\n)', html, re.DOTALL)
-        for step in steps:
-            clean = re.sub(r'<[^>]+>', '', step).strip()
-            if clean and len(clean) > 10:
-                # Remove numbering
-                clean = re.sub(r'^\d+[\.\)]\s*', '', clean)
-                tasks.append(clean)
-        
-        # Pattern 2: Task/Step sections
-        if not tasks:
-            task_sections = re.findall(r'(?:Task|Step|Instructions?|Cara|Langkah).*?(?:<ol|<ul).*?>(.*?)</(?:ol|ul)>', html, re.DOTALL | re.IGNORECASE)
-            for section in task_sections:
-                items = re.findall(r'<li[^>]*>(.*?)</li>', section, re.DOTALL)
-                for item in items:
-                    clean = re.sub(r'<[^>]+>', '', item).strip()
-                    if clean and len(clean) > 5:
-                        tasks.append(clean)
-        
-        # Pattern 3: Action verbs
-        if not tasks:
-            action_patterns = [
-                r'(?:Follow|Join|Subscribe|Like|Retweet|Comment|Share|Connect|Submit|Fill|Complete|Claim|Register|Visit|Download|Install|Register|Sign up)\s+[^<]*',
-            ]
-            for pattern in action_patterns:
-                matches = re.findall(pattern, html, re.IGNORECASE)
-                for match in matches[:5]:
-                    clean = re.sub(r'<[^>]+>', '', match).strip()
-                    if clean:
-                        tasks.append(clean)
-        
-        return tasks[:6]  # Max 6 tasks
+    def _curl_get(self, url, headers=None):
+        cmd = ['curl', '-s', '-L', '--max-time', '15', '--insecure']
+        if headers:
+            for k, v in headers.items():
+                cmd.extend(['-H', f'{k}: {v}'])
+        cmd.append(url)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+            return result.stdout
+        except:
+            return None
     
-    def _extract_reward_info(self, html):
-        """Extract reward information"""
-        reward_patterns = [
-            r'(?:reward|prize|earning| earning|token|BDX|ETH|SOL|USDT|USDC).*?(\d+[\d,\.]*\s*(?:BDX|ETH|SOL|USDT|USDC|tokens?))',
-            r'(\d+[\d,\.]*)\s*(?:BDX|ETH|SOL|USDT|USDC|tokens?)\s*(?:per|for|each)',
+    def search_google_news(self):
+        """Search using Google News RSS - most reliable"""
+        self._log("Searching Google News RSS...")
+        
+        queries = [
+            "crypto airdrop free claim",
+            "new airdrop september 2026",
+            "free token airdrop",
         ]
         
-        for pattern in reward_patterns:
-            match = re.search(pattern, html, re.IGNORECASE)
-            if match:
-                return match.group(0).strip()
+        all_results = []
         
-        return None
-    
-    def _extract_deadline(self, html):
-        """Extract deadline information"""
-        deadline_patterns = [
-            r'(?:deadline|ends?|ending|closes?|last day).*?(\d{1,2}[\s/\-]?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s/\-]?\d{2,4})',
-            r'(?:before|until|by)\s+(\d{1,2}[\s/\-]?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s/\-]?\d{2,4})',
-        ]
-        
-        for pattern in deadline_patterns:
-            match = re.search(pattern, html, re.IGNORECASE)
-            if match:
-                return match.group(0).strip()
-        
-        return None
-    
-    def scrape_airdrops_from_rss(self):
-        """Scrape airdrops from RSS feeds"""
-        self._log("Scraping RSS feeds...")
-        
-        rss_feeds = [
-            "https://airdrops.io/feed/",
-            "https://cryptorank.io/feed/airdrops",
-            "https://coingabbar.com/feed/airdrops",
-        ]
-        
-        all_airdrops = []
-        
-        for feed_url in rss_feeds:
-            try:
-                response = requests.get(feed_url, timeout=15, headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                })
+        for query in queries:
+            encoded = query.replace(' ', '+')
+            url = f"https://news.google.com/rss/search?q={encoded}+airdrop&hl=en-US&gl=US&ceid=US:en"
+            
+            html = self._curl_get(url)
+            if not html:
+                continue
+            
+            # Parse RSS items
+            items = re.findall(r'<item>(.*?)</item>', html, re.DOTALL)
+            
+            for item in items:
+                title_match = re.search(r'<title>(.*?)</title>', item)
+                link_match = re.search(r'<link/>(.*?)(?:\n|<)', item)
+                if not link_match:
+                    link_match = re.search(r'<link>(.*?)</link>', item)
+                desc_match = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
                 
-                if response.status_code == 200:
-                    # Parse RSS manually
-                    items = re.findall(r'<item>(.*?)</item>', response.text, re.DOTALL)
+                if title_match:
+                    title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_match.group(1)).strip()
+                    link = link_match.group(1).strip() if link_match else ""
+                    desc = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', desc_match.group(1)).strip() if desc_match else ""
+                    desc = re.sub(r'<[^>]+>', '', desc).strip()
                     
-                    for item in items[:10]:
-                        title_match = re.search(r'<title>(.*?)</title>', item)
-                        link_match = re.search(r'<link>(.*?)</link>', item)
-                        desc_match = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
-                        
-                        if title_match and link_match:
-                            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_match.group(1)).strip()
-                            link = link_match.group(1).strip()
-                            desc = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', desc_match.group(1)).strip() if desc_match else ""
-                            
-                            # Skip affiliate links
-                            is_affiliate, domain = self._is_affiliate_link(link)
-                            if is_affiliate:
-                                continue
-                            
-                            # Check for scam
-                            is_scam, keyword = self._is_scam(desc)
-                            if is_scam:
-                                continue
-                            
-                            # Check if free
-                            is_free, reason = self._is_free_airdrop(desc)
-                            if not is_free:
-                                continue
-                            
-                            # Extract detailed tasks from website
-                            try:
-                                website_response = requests.get(link, timeout=15, headers={
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                                })
-                                if website_response.status_code == 200:
-                                    tasks = self._extract_detailed_tasks(website_response.text, link)
-                                    reward = self._extract_reward_info(website_response.text)
-                                    deadline = self._extract_deadline(website_response.text)
-                                else:
-                                    tasks = []
-                                    reward = None
-                                    deadline = None
-                            except:
-                                tasks = []
-                                reward = None
-                                deadline = None
-                            
-                            all_airdrops.append({
-                                'title': title,
-                                'url': link,
-                                'tasks': tasks,
-                                'reward': reward,
-                                'deadline': deadline,
-                                'source': 'RSS',
-                            })
-            except Exception as e:
-                self._log(f"Error fetching {feed_url}: {e}")
+                    # Skip affiliate
+                    is_affiliate, domain = self._is_affiliate_link(link)
+                    if is_affiliate:
+                        continue
+                    
+                    # Skip if not airdrop related
+                    if not any(x in (title + desc).lower() for x in ['airdrop', 'free', 'claim', 'token']):
+                        continue
+                    
+                    all_results.append({
+                        'title': title,
+                        'url': link,
+                        'description': desc[:200],
+                    })
         
-        return all_airdrops
+        return all_results
+    
+    def extract_official_url(self, article_url):
+        """Try to extract official project URL from article"""
+        html = self._curl_get(article_url, {'User-Agent': 'Mozilla/5.0'})
+        if not html:
+            return article_url
+        
+        # Look for official links
+        patterns = [
+            r'(?:official|website|visit|go to|join)[:\s]+(https?://[^\s<>"]+)',
+            r'href="(https?://(?!(?:www\.)?(?:' + '|'.join(['youtube', 'twitter', 'tiktok', 'reddit', 'facebook', 'instagram']) + r')[^\s]*))',
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, html, re.IGNORECASE)
+            for url in matches:
+                is_affiliate, _ = self._is_affiliate_link(url)
+                if not is_affiliate:
+                    return url
+        
+        return article_url
     
     def format_message(self, airdrops):
-        """Format Telegram message with detailed tasks"""
         if not airdrops:
             return None
         
@@ -222,31 +163,21 @@ class AirdropHunterV4:
         msg += f"{'='*30}\n\n"
         
         for i, airdrop in enumerate(airdrops[:5], 1):
-            msg += f"🔥 <b>{i}. {airdrop['title']}</b>\n"
-            msg += f"🔗 Official: {airdrop['url']}\n"
+            msg += f"🔥 <b>{i}. {airdrop['title'][:60]}</b>\n"
             
-            # Add reward info
-            if airdrop.get('reward'):
-                msg += f"💰 Reward: {airdrop['reward']}\n"
+            # Use official URL if available
+            url = airdrop.get('official_url', airdrop['url'])
+            msg += f"🔗 Link: {url}\n"
             
-            # Add deadline
-            if airdrop.get('deadline'):
-                msg += f"⏰ Deadline: {airdrop['deadline']}\n"
-            
-            # Add detailed tasks
-            if airdrop.get('tasks'):
-                msg += f"\n📋 <b>Task:</b>\n"
-                for j, task in enumerate(airdrop['tasks'][:4], 1):
-                    msg += f"  {j}. {task}\n"
-            else:
-                msg += f"📋 Task: Kunjungi website & ikuti instruksi\n"
+            if airdrop.get('description'):
+                msg += f"📝 {airdrop['description'][:100]}\n"
             
             msg += f"\n{'─'*30}\n\n"
         
         if len(airdrops) > 5:
             msg += f"... +{len(airdrops) - 5} airdrop lainnya\n\n"
         
-        msg += f"💡 <b>Semua GRATIS!</b>\n"
+        msg += f"💡 <b>Semua info dari berita terbaru!</b>\n"
         msg += f"🛡️ Scam filter: ON\n"
         msg += f"⚠️ Jangan pernah share private key!\n"
         
@@ -282,27 +213,37 @@ class AirdropHunterV4:
     def run(self):
         self._log("Airdrop Hunter V4 started!")
         
-        # Scrape from multiple sources
-        all_airdrops = self.scrape_airdrops_from_rss()
+        # Search from Google News RSS
+        results = self.search_google_news()
+        self._log(f"Found {len(results)} results")
         
-        # Deduplicate and filter
+        # Filter & process
         valid_airdrops = []
-        seen_urls = set()
         
-        for airdrop in all_airdrops:
-            url = airdrop['url']
+        for result in results[:15]:
+            url = result['url']
             
-            # Skip if already seen
-            if url in seen_urls:
+            # Skip affiliate
+            is_affiliate, _ = self._is_affiliate_link(url)
+            if is_affiliate:
                 continue
-            seen_urls.add(url)
             
-            # Skip if already in seen list
-            airdrop_id = f"v4_{hash(url)}"
+            # Check scam in description
+            is_scam, _ = self._is_scam(result.get('description', ''))
+            if is_scam:
+                continue
+            
+            # Check free
+            is_free, _ = self._is_free_airdrop(result.get('description', ''))
+            if not is_free:
+                continue
+            
+            # Check if already seen
+            airdrop_id = f"news_{hash(url)}"
             if airdrop_id in self.seen:
                 continue
             
-            valid_airdrops.append(airdrop)
+            valid_airdrops.append(result)
             self._mark_seen(airdrop_id)
         
         self._log(f"Found {len(valid_airdrops)} valid airdrops")
@@ -311,8 +252,8 @@ class AirdropHunterV4:
         if valid_airdrops:
             msg = self.format_message(valid_airdrops)
             if msg:
-                self._send_telegram(msg)
-                self._log(f"Sent {len(valid_airdrops)} airdrops")
+                success = self._send_telegram(msg)
+                self._log(f"Sent {len(valid_airdrops)} airdrops - OK: {success}")
         else:
             self._log("No valid airdrops found")
         
