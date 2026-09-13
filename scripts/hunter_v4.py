@@ -68,22 +68,70 @@ class AirdropHunterV4:
                     return False, indicator
         return True, ""
     
-    def _extract_tasks(self, text):
+    def _extract_detailed_tasks(self, html, url):
+        """Extract detailed step-by-step tasks from official website"""
         tasks = []
-        steps = re.findall(r'(\d+)\.\s*(.*?)(?=\d+\.|$)', text, re.DOTALL)
-        for num, step in steps:
-            clean_step = re.sub(r'<[^>]+>', '', step).strip()
-            if clean_step and len(clean_step) > 5:
-                tasks.append(clean_step)
         
+        # Pattern 1: Numbered lists (most common)
+        steps = re.findall(r'<(?:li|p)[^>]*>\s*(?:<[^>]+>)*\s*(\d+[\.\)]\s*.*?)(?:</(?:li|p)>|\n)', html, re.DOTALL)
+        for step in steps:
+            clean = re.sub(r'<[^>]+>', '', step).strip()
+            if clean and len(clean) > 10:
+                # Remove numbering
+                clean = re.sub(r'^\d+[\.\)]\s*', '', clean)
+                tasks.append(clean)
+        
+        # Pattern 2: Task/Step sections
         if not tasks:
-            actions = re.findall(r'(?:follow|like|retweet|join|subscribe|comment|share|connect|submit|fill|complete|claim|register)\s+[^.]*', text, re.IGNORECASE)
-            for action in actions[:5]:
-                clean_action = re.sub(r'<[^>]+>', '', action).strip()
-                if clean_action:
-                    tasks.append(clean_action)
+            task_sections = re.findall(r'(?:Task|Step|Instructions?|Cara|Langkah).*?(?:<ol|<ul).*?>(.*?)</(?:ol|ul)>', html, re.DOTALL | re.IGNORECASE)
+            for section in task_sections:
+                items = re.findall(r'<li[^>]*>(.*?)</li>', section, re.DOTALL)
+                for item in items:
+                    clean = re.sub(r'<[^>]+>', '', item).strip()
+                    if clean and len(clean) > 5:
+                        tasks.append(clean)
         
-        return tasks[:5]
+        # Pattern 3: Action verbs
+        if not tasks:
+            action_patterns = [
+                r'(?:Follow|Join|Subscribe|Like|Retweet|Comment|Share|Connect|Submit|Fill|Complete|Claim|Register|Visit|Download|Install|Register|Sign up)\s+[^<]*',
+            ]
+            for pattern in action_patterns:
+                matches = re.findall(pattern, html, re.IGNORECASE)
+                for match in matches[:5]:
+                    clean = re.sub(r'<[^>]+>', '', match).strip()
+                    if clean:
+                        tasks.append(clean)
+        
+        return tasks[:6]  # Max 6 tasks
+    
+    def _extract_reward_info(self, html):
+        """Extract reward information"""
+        reward_patterns = [
+            r'(?:reward|prize|earning| earning|token|BDX|ETH|SOL|USDT|USDC).*?(\d+[\d,\.]*\s*(?:BDX|ETH|SOL|USDT|USDC|tokens?))',
+            r'(\d+[\d,\.]*)\s*(?:BDX|ETH|SOL|USDT|USDC|tokens?)\s*(?:per|for|each)',
+        ]
+        
+        for pattern in reward_patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                return match.group(0).strip()
+        
+        return None
+    
+    def _extract_deadline(self, html):
+        """Extract deadline information"""
+        deadline_patterns = [
+            r'(?:deadline|ends?|ending|closes?|last day).*?(\d{1,2}[\s/\-]?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s/\-]?\d{2,4})',
+            r'(?:before|until|by)\s+(\d{1,2}[\s/\-]?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s/\-]?\d{2,4})',
+        ]
+        
+        for pattern in deadline_patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                return match.group(0).strip()
+        
+        return None
     
     def scrape_airdrops_from_rss(self):
         """Scrape airdrops from RSS feeds"""
@@ -132,13 +180,30 @@ class AirdropHunterV4:
                             if not is_free:
                                 continue
                             
-                            # Extract tasks
-                            tasks = self._extract_tasks(desc)
+                            # Extract detailed tasks from website
+                            try:
+                                website_response = requests.get(link, timeout=15, headers={
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                })
+                                if website_response.status_code == 200:
+                                    tasks = self._extract_detailed_tasks(website_response.text, link)
+                                    reward = self._extract_reward_info(website_response.text)
+                                    deadline = self._extract_deadline(website_response.text)
+                                else:
+                                    tasks = []
+                                    reward = None
+                                    deadline = None
+                            except:
+                                tasks = []
+                                reward = None
+                                deadline = None
                             
                             all_airdrops.append({
                                 'title': title,
                                 'url': link,
                                 'tasks': tasks,
+                                'reward': reward,
+                                'deadline': deadline,
                                 'source': 'RSS',
                             })
             except Exception as e:
@@ -146,22 +211,8 @@ class AirdropHunterV4:
         
         return all_airdrops
     
-    def scrape_airdrops_from_api(self):
-        """Scrape airdrops from public APIs"""
-        self._log("Scraping APIs...")
-        
-        all_airdrops = []
-        
-        # CoinGecko airdrops (if available)
-        try:
-            # This is a placeholder - actual API may vary
-            pass
-        except:
-            pass
-        
-        return all_airdrops
-    
     def format_message(self, airdrops):
+        """Format Telegram message with detailed tasks"""
         if not airdrops:
             return None
         
@@ -174,9 +225,18 @@ class AirdropHunterV4:
             msg += f"🔥 <b>{i}. {airdrop['title']}</b>\n"
             msg += f"🔗 Official: {airdrop['url']}\n"
             
+            # Add reward info
+            if airdrop.get('reward'):
+                msg += f"💰 Reward: {airdrop['reward']}\n"
+            
+            # Add deadline
+            if airdrop.get('deadline'):
+                msg += f"⏰ Deadline: {airdrop['deadline']}\n"
+            
+            # Add detailed tasks
             if airdrop.get('tasks'):
                 msg += f"\n📋 <b>Task:</b>\n"
-                for j, task in enumerate(airdrop['tasks'][:3], 1):
+                for j, task in enumerate(airdrop['tasks'][:4], 1):
                     msg += f"  {j}. {task}\n"
             else:
                 msg += f"📋 Task: Kunjungi website & ikuti instruksi\n"
@@ -223,9 +283,7 @@ class AirdropHunterV4:
         self._log("Airdrop Hunter V4 started!")
         
         # Scrape from multiple sources
-        all_airdrops = []
-        all_airdrops.extend(self.scrape_airdrops_from_rss())
-        all_airdrops.extend(self.scrape_airdrops_from_api())
+        all_airdrops = self.scrape_airdrops_from_rss()
         
         # Deduplicate and filter
         valid_airdrops = []
