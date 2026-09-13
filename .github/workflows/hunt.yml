@@ -2,7 +2,7 @@ name: Airdrop Hunter
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 */3 * * *'  # Every 3 hours
   workflow_dispatch:
 
 jobs:
@@ -16,8 +16,11 @@ jobs:
         with:
           python-version: '3.11'
       
+      - name: Install dependencies
+        run: pip install requests feedparser
+      
       - name: Run Airdrop Hunter
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/hunter.py
+        run: python scripts/hunter_v4.py
