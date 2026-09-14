@@ -12,18 +12,97 @@ class AirdropHunterV4:
         self.seen_file = "config/seen_airdrops.json"
         self.seen = self._load_seen()
         
-        self.scam_keywords = [
-            'private key', 'seed phrase', 'recovery phrase',
-            'send eth', 'send sol', 'send bnb', 'send matic',
-            'invest', 'deposit', 'minimum', 'gas fee required',
-            'pay to claim', 'buy token', 'purchase',
-        ]
-        
-        self.affiliate_domains = [
-            'airdrops.io', 'airdropalert.com', 'coingabbar.com',
-            'alphadrops.net', 'airdropbuzz.com', 'cryptorank.io',
-            'coinmarketcap.com', 'coingecko.com', 'droomdroom.com',
-            'marketcapof.com', 'coinpedia.org',
+        # Curated verified airdrops - updated manually
+        self.airdrops = [
+            {
+                'name': 'BELDEX LOYALTY PROGRAM',
+                'hadiah': '50-500 BDX',
+                'nilai': 'Rp 60.000 - 600.000',
+                'status': 'ACTIVE',
+                'website': 'https://quest.beldex.io/loyalty',
+                'twitter': 'https://x.com/BeldexOfficial',
+                'discord': 'https://discord.gg/beldex',
+                'wallet': 'Trust Wallet',
+                'wallet_download': 'https://play.google.com/store/apps/details?id=com.trustwallet.dropdown',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Klik Connect Wallet',
+                    'Pilih Trust Wallet',
+                    'Klik Allow',
+                    'Klik link Twitter, Follow',
+                    'Klik link Discord, Join server',
+                    'Retweet postingan terbaru',
+                    'Klik Submit di website',
+                    'Done! Points masuk',
+                ],
+                'cashout': [
+                    'Points dikonversi ke token BDX',
+                    'Download MEXC: https://play.google.com/store/apps/details?id=app.mexc',
+                    'Daftar + verifikasi KYC (foto KTP)',
+                    'Kirim BDX dari Trust Wallet ke MEXC',
+                    'Jual BDX ke Rupiah',
+                    'Tarik ke rekening bank',
+                ],
+                'info': 'CoinGecko listed, Team terverifikasi, 100% GRATIS',
+                'key': 'beldex_loyalty',
+            },
+            {
+                'name': 'GRASS PROTOCOL',
+                'hadiah': '$GRASS tokens',
+                'nilai': 'Bisa dijual langsung',
+                'status': 'SEASON 3',
+                'website': 'https://www.grass.io/register',
+                'twitter': 'https://x.com/getgrass_io',
+                'discord': 'https://discord.gg/getgrass',
+                'wallet': 'Tidak perlu wallet',
+                'wallet_download': '',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Isi email + password',
+                    'Klik Register',
+                    'Download Grass extension',
+                    'Install di Chrome',
+                    'Login pakai email',
+                    'Biarkan jalan 24/7',
+                    'Points nambah sendiri',
+                ],
+                'cashout': [
+                    'Points ditukar ke $GRASS token',
+                    'Download MEXC atau Raydium',
+                    'Jual $GRASS ke USDC',
+                    'Tarik ke rekening bank',
+                ],
+                'info': '2M+ users, Backed by top VCs, 100% GRATIS',
+                'key': 'grass_protocol',
+            },
+            {
+                'name': 'PHAROS NETWORK',
+                'hadiah': '$PROS tokens',
+                'nilai': 'Bisa dijual',
+                'status': 'ACTIVE',
+                'website': 'https://pharosnetwork.xyz',
+                'twitter': 'https://x.com/PharosNetwork',
+                'discord': 'https://discord.gg/pharosnetwork',
+                'wallet': 'Trust Wallet',
+                'wallet_download': 'https://play.google.com/store/apps/details?id=com.trustwallet.dropdown',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Klik Connect Wallet',
+                    'Pilih Trust Wallet',
+                    'Follow Twitter @PharosNetwork',
+                    'Join Telegram group',
+                    'Retweet announcement',
+                    'Done!',
+                ],
+                'cashout': [
+                    'Token otomatis masuk wallet',
+                    'Download MEXC',
+                    'Jual token ke Rupiah',
+                    'Tarik ke rekening bank',
+                ],
+                'info': 'Backed by VC, Mainnet launching, 100% GRATIS',
+                'key': 'pharos_network',
+            },
         ]
     
     def _load_seen(self):
@@ -41,124 +120,50 @@ class AirdropHunterV4:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] {msg}")
     
-    def _is_scam(self, text):
-        text_lower = text.lower()
-        for keyword in self.scam_keywords:
-            if keyword in text_lower:
-                return True, keyword
-        return False, ""
+    def _mark_seen(self, key):
+        self.seen[key] = datetime.now().isoformat()
+        cutoff = (datetime.now() - timedelta(days=7)).isoformat()
+        self.seen = {k: v for k, v in self.seen.items() if v > cutoff}
+        self._save_seen()
     
-    def _is_affiliate_link(self, url):
-        for domain in self.affiliate_domains:
-            if domain in url.lower():
-                return True, domain
-        return False, ""
-    
-    def _is_free_airdrop(self, text):
-        text_lower = text.lower()
-        payment_indicators = [
-            'send', 'transfer', 'invest', 'deposit', 'buy',
-            'purchase', 'stake', 'bridge', 'swap', 'pay',
-            'gas fee', 'transaction fee', 'minimum',
-        ]
-        for indicator in payment_indicators:
-            if indicator in text_lower:
-                if re.search(rf'(?:you|user|must|need|should|have to)\s+{indicator}', text_lower):
-                    return False, indicator
-        return True, ""
-    
-    def _curl_get(self, url, headers=None):
-        cmd = ['curl', '-s', '-L', '--max-time', '15', '--insecure']
-        if headers:
-            for k, v in headers.items():
-                cmd.extend(['-H', f'{k}: {v}'])
-        cmd.append(url)
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
-            return result.stdout
-        except:
-            return None
-    
-    def search_google_news(self):
-        self._log("Searching Google News RSS...")
-        
-        queries = [
-            "crypto airdrop free claim",
-            "new airdrop september 2026",
-            "free token airdrop",
-        ]
-        
-        all_results = []
-        
-        for query in queries:
-            encoded = query.replace(' ', '+')
-            url = f"https://news.google.com/rss/search?q={encoded}+airdrop&hl=en-US&gl=US&ceid=US:en"
-            
-            html = self._curl_get(url)
-            if not html:
-                continue
-            
-            items = re.findall(r'<item>(.*?)</item>', html, re.DOTALL)
-            
-            for item in items:
-                title_match = re.search(r'<title>(.*?)</title>', item)
-                link_match = re.search(r'<link/>(.*?)(?:\n|<)', item)
-                if not link_match:
-                    link_match = re.search(r'<link>(.*?)</link>', item)
-                desc_match = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
-                
-                if title_match:
-                    title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title_match.group(1)).strip()
-                    link = link_match.group(1).strip() if link_match else ""
-                    desc = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', desc_match.group(1)).strip() if desc_match else ""
-                    desc = re.sub(r'<[^>]+>', '', desc).strip()
-                    
-                    is_affiliate, domain = self._is_affiliate_link(link)
-                    if is_affiliate:
-                        continue
-                    
-                    if not any(x in (title + desc).lower() for x in ['airdrop', 'free', 'claim', 'token']):
-                        continue
-                    
-                    all_results.append({
-                        'title': title,
-                        'url': link,
-                        'description': desc[:200],
-                    })
-        
-        return all_results
-    
-    def format_message(self, airdrops):
-        if not airdrops:
-            return None
-        
-        # Pick best airdrop
-        airdrop = airdrops[0]
-        
+    def format_message(self, airdrop):
         msg = "REKOMENDASI HARI INI\n"
         msg += "==============================\n\n"
-        msg += f"{airdrop['title'][:50]}\n\n"
-        msg += f"Link: {airdrop['url']}\n\n"
+        msg += f"{airdrop['name']}\n\n"
+        msg += f"Hadiah: {airdrop['hadiah']}\n"
+        msg += f"Nilai: {airdrop['nilai']}\n"
+        msg += f"Status: {airdrop['status']}\n\n"
         
-        if airdrop.get('description'):
-            msg += f"Detail: {airdrop['description'][:150]}\n\n"
+        msg += "--- LINK LANGSUNG ---\n\n"
+        msg += f"Website: {airdrop['website']}\n"
+        msg += f"Twitter: {airdrop['twitter']}\n"
+        msg += f"Discord: {airdrop['discord']}\n\n"
+        
+        msg += "--- YANG PERLU LO SIAPIN ---\n\n"
+        if airdrop['wallet'] != 'Tidak perlu wallet':
+            msg += f"1. {airdrop['wallet']}\n"
+            if airdrop['wallet_download']:
+                msg += f"- Download: {airdrop['wallet_download']}\n"
+            msg += "- GRATIS, bikin wallet baru\n"
+            msg += "- SIMPAN 12 kata rahasia di kertas!\n\n"
+            msg += "2. Akun Twitter\n"
+            msg += "3. Akun Discord\n\n"
+        else:
+            msg += "1. PC/Laptop + Chrome\n"
+            msg += "2. Akun email\n"
+            msg += "3. Internet stabil\n\n"
         
         msg += "--- CARA IKUTAN ---\n\n"
-        msg += "1. Buka link di atas di Chrome HP\n"
-        msg += "2. Connect wallet (Trust Wallet / MetaMask)\n"
-        msg += "3. Follow social media mereka\n"
-        msg += "4. Complete tasks di website\n"
-        msg += "5. Done! Tunggu reward\n\n"
+        for i, step in enumerate(airdrop['steps'], 1):
+            msg += f"Step {i}: {step}\n"
         
-        msg += "--- CARA AMBIL UANGNYA ---\n\n"
-        msg += "1. Download MEXC di Play Store\n"
-        msg += "2. Daftar + verifikasi KYC\n"
-        msg += "3. Kirim token dari wallet ke MEXC\n"
-        msg += "4. Jual ke Rupiah\n"
-        msg += "5. Tarik ke rekening bank\n\n"
+        msg += "\n--- CARA AMBIL UANGNYA ---\n\n"
+        for i, step in enumerate(airdrop['cashout'], 1):
+            msg += f"{i}. {step}\n"
         
-        msg += "==============================\n"
-        msg += "100% GRATIS!\n"
+        msg += "\n--- INFO PROYEK ---\n\n"
+        msg += f"{airdrop['info']}\n\n"
+        msg += "==============================\n\n"
         msg += "Jangan kasih seed phrase = SCAM!\n"
         
         return msg
@@ -166,7 +171,6 @@ class AirdropHunterV4:
     def _send_telegram(self, message):
         if not self.telegram_bot_token:
             self._log("Telegram not configured")
-            print(f"\n{'='*50}\n{message}\n{'='*50}\n")
             return False
         
         url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
@@ -183,53 +187,28 @@ class AirdropHunterV4:
             self._log(f"Telegram error: {e}")
             return False
     
-    def _mark_seen(self, campaign_id):
-        self.seen[campaign_id] = datetime.now().isoformat()
-        cutoff = (datetime.now() - timedelta(days=7)).isoformat()
-        self.seen = {k: v for k, v in self.seen.items() if v > cutoff}
-        self._save_seen()
-    
     def run(self):
         self._log("Airdrop Hunter V4 started!")
         
-        results = self.search_google_news()
-        self._log(f"Found {len(results)} results")
-        
-        valid_airdrops = []
-        
-        for result in results[:15]:
-            url = result['url']
-            
-            is_affiliate, _ = self._is_affiliate_link(url)
-            if is_affiliate:
-                continue
-            
-            is_scam, _ = self._is_scam(result.get('description', ''))
-            if is_scam:
-                continue
-            
-            is_free, _ = self._is_free_airdrop(result.get('description', ''))
-            if not is_free:
-                continue
-            
-            airdrop_id = f"news_{hash(url)}"
-            if airdrop_id in self.seen:
-                continue
-            
-            valid_airdrops.append(result)
-            self._mark_seen(airdrop_id)
-        
-        self._log(f"Found {len(valid_airdrops)} valid airdrops")
-        
-        if valid_airdrops:
-            msg = self.format_message(valid_airdrops)
-            if msg:
+        # Pick next unseen airdrop
+        sent = False
+        for airdrop in self.airdrops:
+            if airdrop['key'] not in self.seen:
+                msg = self.format_message(airdrop)
                 success = self._send_telegram(msg)
-                self._log(f"Sent airdrop - OK: {success}")
-        else:
-            self._log("No valid airdrops found")
+                self._log(f"Sent: {airdrop['name']} - OK: {success}")
+                self._mark_seen(airdrop['key'])
+                sent = True
+                break
         
-        return valid_airdrops
+        if not sent:
+            # All seen, reset and start over
+            self._log("All airdrops seen, resetting...")
+            self.seen = {}
+            self._save_seen()
+            self.run()
+        
+        return True
 
 if __name__ == "__main__":
     hunter = AirdropHunterV4()
