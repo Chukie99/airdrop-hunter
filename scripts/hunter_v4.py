@@ -80,7 +80,6 @@ class AirdropHunterV4:
             return None
     
     def search_google_news(self):
-        """Search using Google News RSS - most reliable"""
         self._log("Searching Google News RSS...")
         
         queries = [
@@ -99,7 +98,6 @@ class AirdropHunterV4:
             if not html:
                 continue
             
-            # Parse RSS items
             items = re.findall(r'<item>(.*?)</item>', html, re.DOTALL)
             
             for item in items:
@@ -115,12 +113,10 @@ class AirdropHunterV4:
                     desc = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', desc_match.group(1)).strip() if desc_match else ""
                     desc = re.sub(r'<[^>]+>', '', desc).strip()
                     
-                    # Skip affiliate
                     is_affiliate, domain = self._is_affiliate_link(link)
                     if is_affiliate:
                         continue
                     
-                    # Skip if not airdrop related
                     if not any(x in (title + desc).lower() for x in ['airdrop', 'free', 'claim', 'token']):
                         continue
                     
@@ -132,54 +128,25 @@ class AirdropHunterV4:
         
         return all_results
     
-    def extract_official_url(self, article_url):
-        """Try to extract official project URL from article"""
-        html = self._curl_get(article_url, {'User-Agent': 'Mozilla/5.0'})
-        if not html:
-            return article_url
-        
-        # Look for official links
-        patterns = [
-            r'(?:official|website|visit|go to|join)[:\s]+(https?://[^\s<>"]+)',
-            r'href="(https?://(?!(?:www\.)?(?:' + '|'.join(['youtube', 'twitter', 'tiktok', 'reddit', 'facebook', 'instagram']) + r')[^\s]*))',
-        ]
-        
-        for pattern in patterns:
-            matches = re.findall(pattern, html, re.IGNORECASE)
-            for url in matches:
-                is_affiliate, _ = self._is_affiliate_link(url)
-                if not is_affiliate:
-                    return url
-        
-        return article_url
-    
     def format_message(self, airdrops):
         if not airdrops:
             return None
         
-        msg = f"🎯 <b>AIRDROP GRATIS - TASK DETAIL!</b>\n"
-        msg += f"💰 100% FREE - Gak perlu bayar apapun!\n"
-        msg += f"📅 {datetime.now().strftime('%d %b %Y %H:%M')}\n"
-        msg += f"{'='*30}\n\n"
+        msg = "REKOMENDASI HARI INI\n"
+        msg += "==============================\n\n"
         
-        for i, airdrop in enumerate(airdrops[:5], 1):
-            msg += f"🔥 <b>{i}. {airdrop['title'][:60]}</b>\n"
-            
-            # Use official URL if available
-            url = airdrop.get('official_url', airdrop['url'])
-            msg += f"🔗 Link: {url}\n"
+        for i, airdrop in enumerate(airdrops[:3], 1):
+            msg += f"{i}. {airdrop['title'][:60]}\n"
+            msg += f"Link: {airdrop['url']}\n"
             
             if airdrop.get('description'):
-                msg += f"📝 {airdrop['description'][:100]}\n"
+                msg += f"Detail: {airdrop['description'][:100]}\n"
             
-            msg += f"\n{'─'*30}\n\n"
+            msg += "\n---\n\n"
         
-        if len(airdrops) > 5:
-            msg += f"... +{len(airdrops) - 5} airdrop lainnya\n\n"
-        
-        msg += f"💡 <b>Semua info dari berita terbaru!</b>\n"
-        msg += f"🛡️ Scam filter: ON\n"
-        msg += f"⚠️ Jangan pernah share private key!\n"
+        msg += "==============================\n"
+        msg += "100% GRATIS!\n"
+        msg += "Jangan kasih seed phrase = SCAM!\n"
         
         return msg
     
@@ -193,7 +160,6 @@ class AirdropHunterV4:
         payload = {
             "chat_id": self.telegram_chat_id,
             "text": message,
-            "parse_mode": "HTML",
             "disable_web_page_preview": True
         }
         
@@ -213,32 +179,26 @@ class AirdropHunterV4:
     def run(self):
         self._log("Airdrop Hunter V4 started!")
         
-        # Search from Google News RSS
         results = self.search_google_news()
         self._log(f"Found {len(results)} results")
         
-        # Filter & process
         valid_airdrops = []
         
         for result in results[:15]:
             url = result['url']
             
-            # Skip affiliate
             is_affiliate, _ = self._is_affiliate_link(url)
             if is_affiliate:
                 continue
             
-            # Check scam in description
             is_scam, _ = self._is_scam(result.get('description', ''))
             if is_scam:
                 continue
             
-            # Check free
             is_free, _ = self._is_free_airdrop(result.get('description', ''))
             if not is_free:
                 continue
             
-            # Check if already seen
             airdrop_id = f"news_{hash(url)}"
             if airdrop_id in self.seen:
                 continue
@@ -248,7 +208,6 @@ class AirdropHunterV4:
         
         self._log(f"Found {len(valid_airdrops)} valid airdrops")
         
-        # Send to Telegram
         if valid_airdrops:
             msg = self.format_message(valid_airdrops)
             if msg:
