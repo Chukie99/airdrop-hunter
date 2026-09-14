@@ -132,17 +132,30 @@ class AirdropHunterV4:
         if not airdrops:
             return None
         
+        # Pick best airdrop
+        airdrop = airdrops[0]
+        
         msg = "REKOMENDASI HARI INI\n"
         msg += "==============================\n\n"
+        msg += f"{airdrop['title'][:50]}\n\n"
+        msg += f"Link: {airdrop['url']}\n\n"
         
-        for i, airdrop in enumerate(airdrops[:3], 1):
-            msg += f"{i}. {airdrop['title'][:60]}\n"
-            msg += f"Link: {airdrop['url']}\n"
-            
-            if airdrop.get('description'):
-                msg += f"Detail: {airdrop['description'][:100]}\n"
-            
-            msg += "\n---\n\n"
+        if airdrop.get('description'):
+            msg += f"Detail: {airdrop['description'][:150]}\n\n"
+        
+        msg += "--- CARA IKUTAN ---\n\n"
+        msg += "1. Buka link di atas di Chrome HP\n"
+        msg += "2. Connect wallet (Trust Wallet / MetaMask)\n"
+        msg += "3. Follow social media mereka\n"
+        msg += "4. Complete tasks di website\n"
+        msg += "5. Done! Tunggu reward\n\n"
+        
+        msg += "--- CARA AMBIL UANGNYA ---\n\n"
+        msg += "1. Download MEXC di Play Store\n"
+        msg += "2. Daftar + verifikasi KYC\n"
+        msg += "3. Kirim token dari wallet ke MEXC\n"
+        msg += "4. Jual ke Rupiah\n"
+        msg += "5. Tarik ke rekening bank\n\n"
         
         msg += "==============================\n"
         msg += "100% GRATIS!\n"
@@ -212,7 +225,7 @@ class AirdropHunterV4:
             msg = self.format_message(valid_airdrops)
             if msg:
                 success = self._send_telegram(msg)
-                self._log(f"Sent {len(valid_airdrops)} airdrops - OK: {success}")
+                self._log(f"Sent airdrop - OK: {success}")
         else:
             self._log("No valid airdrops found")
         
