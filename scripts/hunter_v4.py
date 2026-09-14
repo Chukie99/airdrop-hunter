@@ -12,7 +12,7 @@ class AirdropHunterV4:
         self.seen_file = "config/seen_airdrops.json"
         self.seen = self._load_seen()
         
-        # Curated verified airdrops - updated manually
+        # Curated airdrops - SIMPLE TASKS ONLY
         self.airdrops = [
             {
                 'name': 'BELDEX LOYALTY PROGRAM',
@@ -22,8 +22,6 @@ class AirdropHunterV4:
                 'website': 'https://quest.beldex.io/loyalty',
                 'twitter': 'https://x.com/BeldexOfficial',
                 'discord': 'https://discord.gg/beldex',
-                'wallet': 'Trust Wallet',
-                'wallet_download': 'https://play.google.com/store/apps/details?id=com.trustwallet.dropdown',
                 'steps': [
                     'Buka link Website di Chrome HP',
                     'Klik Connect Wallet',
@@ -37,43 +35,11 @@ class AirdropHunterV4:
                 ],
                 'cashout': [
                     'Points dikonversi ke token BDX',
-                    'Download MEXC: https://play.google.com/store/apps/details?id=app.mexc',
-                    'Daftar + verifikasi KYC (foto KTP)',
-                    'Kirim BDX dari Trust Wallet ke MEXC',
+                    'Download MEXC',
                     'Jual BDX ke Rupiah',
                     'Tarik ke rekening bank',
                 ],
-                'info': 'CoinGecko listed, Team terverifikasi, 100% GRATIS',
                 'key': 'beldex_loyalty',
-            },
-            {
-                'name': 'GRASS PROTOCOL',
-                'hadiah': '$GRASS tokens',
-                'nilai': 'Bisa dijual langsung',
-                'status': 'SEASON 3',
-                'website': 'https://www.grass.io/register',
-                'twitter': 'https://x.com/getgrass_io',
-                'discord': 'https://discord.gg/getgrass',
-                'wallet': 'Tidak perlu wallet',
-                'wallet_download': '',
-                'steps': [
-                    'Buka link Website di Chrome HP',
-                    'Isi email + password',
-                    'Klik Register',
-                    'Download Grass extension',
-                    'Install di Chrome',
-                    'Login pakai email',
-                    'Biarkan jalan 24/7',
-                    'Points nambah sendiri',
-                ],
-                'cashout': [
-                    'Points ditukar ke $GRASS token',
-                    'Download MEXC atau Raydium',
-                    'Jual $GRASS ke USDC',
-                    'Tarik ke rekening bank',
-                ],
-                'info': '2M+ users, Backed by top VCs, 100% GRATIS',
-                'key': 'grass_protocol',
             },
             {
                 'name': 'PHAROS NETWORK',
@@ -82,9 +48,7 @@ class AirdropHunterV4:
                 'status': 'ACTIVE',
                 'website': 'https://pharosnetwork.xyz',
                 'twitter': 'https://x.com/PharosNetwork',
-                'discord': 'https://discord.gg/pharosnetwork',
-                'wallet': 'Trust Wallet',
-                'wallet_download': 'https://play.google.com/store/apps/details?id=com.trustwallet.dropdown',
+                'telegram': 'https://t.me/pharosnetwork',
                 'steps': [
                     'Buka link Website di Chrome HP',
                     'Klik Connect Wallet',
@@ -100,8 +64,71 @@ class AirdropHunterV4:
                     'Jual token ke Rupiah',
                     'Tarik ke rekening bank',
                 ],
-                'info': 'Backed by VC, Mainnet launching, 100% GRATIS',
                 'key': 'pharos_network',
+            },
+            {
+                'name': 'DEEPBOOK',
+                'hadiah': '$DEEP tokens',
+                'nilai': 'Bisa dijual',
+                'status': 'CLAIM LIVE',
+                'website': 'https://deepbook.tech',
+                'twitter': 'https://x.com/deepbookv3',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Connect wallet (Sui)',
+                    'Klik Claim Airdrop',
+                    'Masukin wallet address',
+                    'Done! Token masuk',
+                ],
+                'cashout': [
+                    'Token masuk wallet',
+                    'Download MEXC atau Bybit',
+                    'Jual token ke Rupiah',
+                    'Tarik ke rekening bank',
+                ],
+                'key': 'deepbook',
+            },
+            {
+                'name': 'CANOPY',
+                'hadiah': '$CANOPY tokens',
+                'nilai': 'Bisa dijual',
+                'status': 'CLAIM LIVE',
+                'website': 'https://canopy.finance',
+                'twitter': 'https://x.com/CanopyFinance',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Connect wallet',
+                    'Klik Claim',
+                    'Follow Twitter mereka',
+                    'Done! Token masuk',
+                ],
+                'cashout': [
+                    'Token masuk wallet',
+                    'Jual di exchange',
+                    'Tarik ke rekening bank',
+                ],
+                'key': 'canopy',
+            },
+            {
+                'name': 'YAKKAMON',
+                'hadiah': 'NFT mint',
+                'nilai': 'Bisa dijual',
+                'status': 'MINT LIVE',
+                'website': 'https://yakkamon.xyz',
+                'twitter': 'https://x.com/YakkamonNFT',
+                'steps': [
+                    'Buka link Website di Chrome HP',
+                    'Connect wallet',
+                    'Klik Mint',
+                    'Mint NFT gratis',
+                    'Done! NFT masuk wallet',
+                ],
+                'cashout': [
+                    'NFT masuk wallet',
+                    'Jual di marketplace',
+                    'Tarik ke rekening bank',
+                ],
+                'key': 'yakkamon',
             },
         ]
     
@@ -122,7 +149,7 @@ class AirdropHunterV4:
     
     def _mark_seen(self, key):
         self.seen[key] = datetime.now().isoformat()
-        cutoff = (datetime.now() - timedelta(days=7)).isoformat()
+        cutoff = (datetime.now() - timedelta(days=14)).isoformat()
         self.seen = {k: v for k, v in self.seen.items() if v > cutoff}
         self._save_seen()
     
@@ -137,23 +164,12 @@ class AirdropHunterV4:
         msg += "--- LINK LANGSUNG ---\n\n"
         msg += f"Website: {airdrop['website']}\n"
         msg += f"Twitter: {airdrop['twitter']}\n"
-        msg += f"Discord: {airdrop['discord']}\n\n"
+        if airdrop.get('telegram'):
+            msg += f"Telegram: {airdrop['telegram']}\n"
+        if airdrop.get('discord'):
+            msg += f"Discord: {airdrop['discord']}\n"
         
-        msg += "--- YANG PERLU LO SIAPIN ---\n\n"
-        if airdrop['wallet'] != 'Tidak perlu wallet':
-            msg += f"1. {airdrop['wallet']}\n"
-            if airdrop['wallet_download']:
-                msg += f"- Download: {airdrop['wallet_download']}\n"
-            msg += "- GRATIS, bikin wallet baru\n"
-            msg += "- SIMPAN 12 kata rahasia di kertas!\n\n"
-            msg += "2. Akun Twitter\n"
-            msg += "3. Akun Discord\n\n"
-        else:
-            msg += "1. PC/Laptop + Chrome\n"
-            msg += "2. Akun email\n"
-            msg += "3. Internet stabil\n\n"
-        
-        msg += "--- CARA IKUTAN ---\n\n"
+        msg += "\n--- CARA IKUTAN ---\n\n"
         for i, step in enumerate(airdrop['steps'], 1):
             msg += f"Step {i}: {step}\n"
         
@@ -161,11 +177,20 @@ class AirdropHunterV4:
         for i, step in enumerate(airdrop['cashout'], 1):
             msg += f"{i}. {step}\n"
         
-        msg += "\n--- INFO PROYEK ---\n\n"
-        msg += f"{airdrop['info']}\n\n"
-        msg += "==============================\n\n"
+        msg += "\n==============================\n"
+        msg += "Task simple: Follow + Join + Submit\n"
+        msg += "100% GRATIS!\n"
         msg += "Jangan kasih seed phrase = SCAM!\n"
         
+        return msg
+    
+    def format_no_new(self):
+        msg = "BELUM ADA AIRDROP BARU\n"
+        msg += "==============================\n\n"
+        msg += f"Update: {datetime.now().strftime('%d %b %Y %H:%M')}\n\n"
+        msg += "Semua airdrop udah dikirim.\n"
+        msg += "Tunggu 6 jam lagi!\n\n"
+        msg += "==============================\n"
         return msg
     
     def _send_telegram(self, message):
@@ -202,11 +227,9 @@ class AirdropHunterV4:
                 break
         
         if not sent:
-            # All seen, reset and start over
-            self._log("All airdrops seen, resetting...")
-            self.seen = {}
-            self._save_seen()
-            self.run()
+            msg = self.format_no_new()
+            success = self._send_telegram(msg)
+            self._log(f"No new airdrops - sent: {success}")
         
         return True
 
