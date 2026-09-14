@@ -1,8 +1,8 @@
-name: Airdrop Hunter OP (3h)
+name: Airdrop Hunter
 
 on:
   schedule:
-    - cron: "0 */3 * * *"  # tiap 3 jam UTC = 07,10,13,16,19,22,01,04 WIB
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
